@@ -127,12 +127,38 @@ updatePost = async (req: Request, res: Response) => {
             });
         }
 
+        // Cari post yang mau di-update
+        const existingPost = await db
+            .select()
+            .from(postsTable)
+            .where(eq(postsTable.id, id));
+
+        if (existingPost.length === 0) {
+            return res.status(404).json({
+                success: false,
+                message: "Post not found",
+            });
+        }
+
+        let imageUrl = existingPost[0].imageUrl;
+        let imagePublicId = existingPost[0].imagePublicId;
+
+        // Kalau user mengirim gambar baru
+        if (req.file) {
+            const uploadedImage = await uploadToCloudinary(req.file.buffer);
+
+            imageUrl = uploadedImage.secure_url;
+            imagePublicId = uploadedImage.public_id;
+        }
+
         await db
             .update(postsTable)
             .set({
                 categoryId,
                 title,
                 content,
+                imageUrl,
+                imagePublicId,
                 updatedAt: new Date(),
             })
             .where(eq(postsTable.id, id));
