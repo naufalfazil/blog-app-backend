@@ -2,7 +2,7 @@ import { Request, Response } from "express";
 import { db } from "../../config/db";
 import { postsTable } from "../../config/schema";
 import { eq, and } from "drizzle-orm";
-import { uploadToCloudinary } from "../../services/cloudinary.service";
+import { uploadToCloudinary, deleteFromCloudinary } from "../../services/cloudinary.service";
 
 class PostController {
 
@@ -127,12 +127,45 @@ updatePost = async (req: Request, res: Response) => {
             });
         }
 
+        // Cari post lama
+        const existingPost = await db
+            .select()
+            .from(postsTable)
+            .where(eq(postsTable.id, id));
+
+        if (existingPost.length === 0) {
+            return res.status(404).json({
+                success: false,
+                message: "Post not found",
+            });
+        }
+
+        let imageUrl = existingPost[0].imageUrl;
+        let imagePublicId = existingPost[0].imagePublicId;
+
+        // Kalau user upload gambar baru
+        if (req.file) {
+            // Upload gambar baru ke Cloudinary
+            const result = await uploadToCloudinary(req.file.buffer);
+
+            imageUrl = result.secure_url;
+            imagePublicId = result.public_id;
+
+            // Hapus gambar lama dari Cloudinary
+            if (existingPost[0].imagePublicId) {
+                await deleteFromCloudinary(existingPost[0].imagePublicId);
+            }
+        }
+
+        // Update data post
         await db
             .update(postsTable)
             .set({
                 categoryId,
                 title,
                 content,
+                imageUrl,
+                imagePublicId,
                 updatedAt: new Date(),
             })
             .where(eq(postsTable.id, id));
