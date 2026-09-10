@@ -2,7 +2,7 @@ import { Request, Response } from "express";
 import { db } from "../../config/db";
 import { postsTable } from "../../config/schema";
 import { eq, and } from "drizzle-orm";
-import { uploadToCloudinary } from "../../services/cloudinary.service";
+import { uploadToCloudinary, deleteFromCloudinary } from "../../services/cloudinary.service";
 
 class PostController {
 
@@ -127,7 +127,7 @@ updatePost = async (req: Request, res: Response) => {
             });
         }
 
-        // Cari post yang mau di-update
+        // Cari post lama
         const existingPost = await db
             .select()
             .from(postsTable)
@@ -143,14 +143,21 @@ updatePost = async (req: Request, res: Response) => {
         let imageUrl = existingPost[0].imageUrl;
         let imagePublicId = existingPost[0].imagePublicId;
 
-        // Kalau user mengirim gambar baru
+        // Kalau user upload gambar baru
         if (req.file) {
-            const uploadedImage = await uploadToCloudinary(req.file.buffer);
+            // Upload gambar baru ke Cloudinary
+            const result = await uploadToCloudinary(req.file.buffer);
 
-            imageUrl = uploadedImage.secure_url;
-            imagePublicId = uploadedImage.public_id;
+            imageUrl = result.secure_url;
+            imagePublicId = result.public_id;
+
+            // Hapus gambar lama dari Cloudinary
+            if (existingPost[0].imagePublicId) {
+                await deleteFromCloudinary(existingPost[0].imagePublicId);
+            }
         }
 
+        // Update data post
         await db
             .update(postsTable)
             .set({
