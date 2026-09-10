@@ -191,6 +191,25 @@ deletePost = async (req: Request, res: Response) => {
     try {
         const id = Number(req.params.id);
 
+        // Cari post yang akan dihapus
+        const existingPost = await db
+            .select()
+            .from(postsTable)
+            .where(eq(postsTable.id, id));
+
+        if (existingPost.length === 0) {
+            return res.status(404).json({
+                success: false,
+                message: "Post not found",
+            });
+        }
+
+        // Hapus gambar dari Cloudinary jika ada
+        if (existingPost[0].imagePublicId) {
+            await deleteFromCloudinary(existingPost[0].imagePublicId);
+        }
+
+        // Soft delete post
         await db
             .update(postsTable)
             .set({
