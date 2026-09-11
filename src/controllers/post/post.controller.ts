@@ -54,10 +54,35 @@ class PostController {
 
     getAllPosts = async (req: Request, res: Response) => {
     try {
-        const posts = await db
-            .select()
-            .from(postsTable)
-            .where(eq(postsTable.status, "published"));
+        const categoryId = req.query.categoryId
+            ? Number(req.query.categoryId)
+            : null;
+
+        if (categoryId !== null && isNaN(categoryId)) {
+            return res.status(400).json({
+                success: false,
+                message: "categoryId harus berupa angka",
+            });
+        }
+
+        let posts;
+
+        if (categoryId !== null) {
+            posts = await db
+                .select()
+                .from(postsTable)
+                .where(
+                    and(
+                        eq(postsTable.status, "published"),
+                        eq(postsTable.categoryId, categoryId)
+                    )
+                );
+        } else {
+            posts = await db
+                .select()
+                .from(postsTable)
+                .where(eq(postsTable.status, "published"));
+        }
 
         return res.status(200).json({
             success: true,
