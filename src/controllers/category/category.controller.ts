@@ -1,6 +1,6 @@
 import { Request, Response } from "express";
 import { db } from "../../config/db";
-import { categoriesTable } from "../../config/schema";
+import { categoriesTable, postsTable } from "../../config/schema";
 import { eq } from "drizzle-orm";
 
 export class CategoryController {
@@ -95,7 +95,7 @@ export class CategoryController {
                 error: error.message,
             });
         }
-    };
+    };  
 
     // UPDATE CATEGORY
     updateCategory = async (req: Request, res: Response) => {
@@ -138,19 +138,35 @@ export class CategoryController {
     deleteCategory = async (req: Request, res: Response) => {
         try {
             const id = Number(req.params.id);
-
+        
+            // Cek apakah kategori masih digunakan oleh artikel
+            const posts = await db
+                .select({
+                    id: postsTable.id,
+                })
+                .from(postsTable)
+                .where(eq(postsTable.categoryId, id));
+            
+            if (posts.length > 0) {
+                return res.status(409).json({
+                    success: false,
+                    message: "Kategori masih digunakan oleh artikel",
+                });
+            }
+        
+            // Hapus kategori jika tidak digunakan artikel
             await db
                 .delete(categoriesTable)
                 .where(eq(categoriesTable.id, id));
-
+        
             return res.status(200).json({
                 success: true,
                 message: "Category deleted successfully",
             });
-
+        
         } catch (error: any) {
             console.error(error);
-
+        
             return res.status(500).json({
                 success: false,
                 message: "Internal server error",
